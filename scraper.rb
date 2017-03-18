@@ -5,6 +5,8 @@ require_relative 'core_ext'
 
 module Dojin
   class Scraper
+    ALBUMS_PER_PAGE = 25
+
     # @param url [String] Gee I wonder what URL could possibly go here.
     def initialize url
       @url = URI::HTTP.build host: url.sub(/https?\/\//, '')
@@ -20,7 +22,7 @@ module Dojin
       tags :genres { |name, id| Genre.new name, id }
     end
 
-    def albums query
+    def albums_by query
       id =
         case query
         when Integer then query
@@ -35,14 +37,14 @@ module Dojin
     end
 
     def newest offset = 0
-      fetch_albums offset: offset.*(25)
+      fetch_albums offset: offset.*(ALBUMS_PER_PAGE)
     end
 
     def changes
       records = {}
       comments_query = '//ol[@id="commentList_"]//div[@class="comment_message"]/p'
 
-      homepage.xpath(comments_query).take(25).reverse.each do |change|
+      homepage.xpath(comments_query).take(ALBUMS_PER_PAGE).reverse.each do |change|
         id = change.xpath('a/@href').text[6..-1].to_i
 
         type =
@@ -76,7 +78,7 @@ module Dojin
         elsif search.nil?       and from_ids.nil? # fetch the new albums
           params_from_ids [], offset: offset
         else
-          raise ArgumentError#.new "#{search.class.inspect} | #{from_ids.inspect}"
+          raise ArgumentError
         end
 
       album_ids = from_ids || nil
@@ -124,9 +126,11 @@ module Dojin
 
         records += new
 
-        break if album_ids.nil? or records.size == album_ids.size
+        album_ids.shift(ALBUMS_PER_PAGE)
 
-        params = params_from_ids(album_ids, offset: records.size)
+        break if album_ids.nil? or album_ids.empty?
+
+        params = params_from_ids(album_ids)
       end
 
       records
@@ -144,7 +148,7 @@ module Dojin
 
     # A search returns the first
     def params_search(query: [], artist: nil, genres: [],
-               excluded_artists: [], excluded_genres: [])
+                      excluded_artists: [], excluded_genres: [])
       { action: 'exploreLoad',
         artist: artist.to_s,
         style: genres,
@@ -161,7 +165,7 @@ module Dojin
     # Get albums when you already know the IDs.
     def params_from_ids albums, offset: 0
       { action: 'infiniteScrollingAction',
-        postsPerPage: 25, # absolutely useless
+        postsPerPage: ALBUMS_PER_PAGE, # absolutely useless
         offset: offset,
         arraySet: albums.to_json
       }
