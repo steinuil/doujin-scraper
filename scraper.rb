@@ -4,24 +4,50 @@ require 'oga'
 require_relative 'core_ext'
 
 module Dojin
+  # @attr name [String] Artist name.
+  # @attr id [Integer] Artist ID in the database.
+  Artist = Struct.new(:name, :id)
+
+  # @attr name [String] Genre name.
+  # @attr id [Integer] Genre ID in the database.
+  Genre = Struct.new(:name, :id)
+
+  # @attr album [Integer] Album referred to in the change.
+  # @attr type [Symbol] Type of change.
+  #   Can be either +:edit+ or +:broken+.
+  Change = Struct.new(:album, :type)
+
+  # @attr id [Integer] Album ID in the database.
+  # @attr title [String] Album title.
+  # @attr url [String, nil] Download link, +nil+ when the link is broken.
+  # @attr cover [String] The URL of the cover.
+  # @attr genres [Array<Integer>] Album genre IDs.
+  # @attr artists [Array<Integer>] Album artists IDs.
+  Album = Struct.new(
+    :id, :title, :url, :cover, :genres, :artists
+  )
+
   class Scraper
     ALBUMS_PER_PAGE = 25
 
-    # @param url [String] Gee I wonder what URL could possibly go here.
     def initialize url
       @url = URI::HTTP.build host: url.sub(/https?\/\//, '')
     end
 
     attr_reader :url
 
+    # Returns an array of Artists
+    # with all the artists on the homepage
     def artists
       tags :artists { |name, id| Artist.new name, id }
     end
 
+    # Returns an array of all Genres
     def genres
       tags :genres { |name, id| Genre.new name, id }
     end
 
+    # Search for all the albums by a certain artist
     def albums_by query
       id =
         case query
@@ -36,31 +62,9 @@ module Dojin
       fetch_albums search: { artist: id }
     end
 
+    # Returns the newest albums
     def newest offset = 0
       fetch_albums offset: offset.*(ALBUMS_PER_PAGE)
-    end
-
-    def changes
-      records = {}
-      comments_query = '//ol[@id="commentList_"]//div[@class="comment_message"]/p'
-
-      homepage.xpath(comments_query).take(ALBUMS_PER_PAGE).reverse.each do |change|
-        id = change.xpath('a/@href').text[6..-1].to_i
-
-        type =
-          case change.text
-          when /.+? is broken\./        then :broken
-          when /.+? has been editted\./ then :edit
-          end
-
-        # We only need the first ones in chronological order,
-        # so we ignore those we've already seen.
-        next if records[id] or type.nil?
-
-        records[id] = type
-      end
-
-      records.map { |a| Change.new *a }
     end
 
     # Refresh the homepage for fetching the new changes
@@ -69,15 +73,42 @@ module Dojin
       @homepage, @artists, @genres = nil
     end
 
+    # Return all albums that match a certain query
     def search query
       raise TypeError unless query.is_a? Array or query.is_a? String
       query = [query] if query.is_a? String
       fetch_albums search: { query: query }
     end
 
+    # Return albums from a list of album IDs
     def albums_from_ids ids
       raise TypeError unless ids.is_a? Array
       fetch_albums from_ids: ids
+    end
+
+    # Returns a list of changes
+    def changes
+      records = {}
+      comments_query =
+        '//ol[@class="commentlist snap_preview"]//div[@class="comment_message"]/p'
+
+      homepage.xpath(comments_query).each do |change|
+        id = change.xpath('a/@href').text[6..-1].to_i
+
+        type =
+          case change.text
+          when /.+? is broken\./        then :broken
+          when /.+? has been editted\./ then :edit
+          end
+
+        next if type.nil?
+
+        # We're only interested in the latest change
+        # to any given album ID.
+        records[id] = type
+      end
+
+      records.map { |a| Change.new *a }.reverse
     end
 
     private
@@ -207,27 +238,4 @@ module Dojin
         .as_xml
     end
   end
-
-  # @attr name [String] Artist name.
-  # @attr id [Integer] Artist ID in the database.
-  Artist = Struct.new(:name, :id)
-
-  # @attr name [String] Genre name.
-  # @attr id [Integer] Genre ID in the database.
-  Genre = Struct.new(:name, :id)
-
-  # @attr album [Integer] Album referred to in the change.
-  # @attr type [Symbol] Type of change.
-  #   Can be either +:edit+ or +:broken+.
-  Change = Struct.new(:album, :type)
-
-  # @attr id [Integer] Album ID in the database.
-  # @attr title [String] Album title.
-  # @attr url [String, nil] Download link, +nil+ when the link is broken.
-  # @attr cover [String] The URL of the cover.
-  # @attr genres [Array<Integer>] Album genre IDs.
-  # @attr artists [Array<Integer>] Album artists IDs.
-  Album = Struct.new(
-    :id, :title, :url, :cover, :genres, :artists
-  )
 end
