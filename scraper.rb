@@ -69,6 +69,19 @@ module Dojin
       @homepage, @artists, @genres = nil
     end
 
+    def search query
+      raise TypeError unless query.is_a? Array or query.is_a? String
+      query = [query] if query.is_a? String
+      fetch_albums search: { query: query }
+    end
+
+    def fetch_album_ids ids
+      raise TypeError unless ids.is_a? Array
+      fetch_albums from_ids: ids
+    end
+
+    private
+
     def fetch_albums search: nil, from_ids: nil, offset: 0
       params =
         if    search.is_a? Hash and from_ids.nil?
@@ -135,8 +148,6 @@ module Dojin
 
       records
     end
-
-    private
 
     def artists_hash
       @artists ||= Hash[tags :artists { |name, id| [ name, id ] }]
