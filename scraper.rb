@@ -75,7 +75,7 @@ module Dojin
       fetch_albums search: { query: query }
     end
 
-    def fetch_album_ids ids
+    def albums_from_ids ids
       raise TypeError unless ids.is_a? Array
       fetch_albums from_ids: ids
     end
