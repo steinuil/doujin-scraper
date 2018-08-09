@@ -39,12 +39,12 @@ module Dojin
     # Returns an array of Artists
     # with all the artists on the homepage
     def artists
-      tags :artists { |name, id| Artist.new name, id }
+      tags(:artists) { |name, id| Artist.new name, id }
     end
 
     # Returns an array of all Genres
     def genres
-      tags :genres { |name, id| Genre.new name, id }
+      tags(:genres) { |name, id| Genre.new name, id }
     end
 
     # Search for all the albums by a certain artist
@@ -181,11 +181,11 @@ module Dojin
     end
 
     def artists_hash
-      @artists ||= Hash[tags :artists { |name, id| [ name, id ] }]
+      @artists ||= Hash[tags(:artists) { |name, id| [ name, id ] }]
     end
 
     def genres_hash
-      @genres ||= Hash[tags :genres { |name, id| [ name, id ] }]
+      @genres ||= Hash[tags(:genres) { |name, id| [ name, id ] }]
     end
 
     # A search returns the first
